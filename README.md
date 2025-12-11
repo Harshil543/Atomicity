@@ -1,6 +1,6 @@
 # Atomicity Demo - Node.js TypeScript Project
 
-This project demonstrates database atomicity concepts using PostgreSQL transactions with TypeORM. It implements a User-Address relationship where one user can have multiple addresses, and ensures that all operations are atomic (all-or-nothing).
+This project demonstrates database atomicity concepts using PostgreSQL transactions with Sequelize. It implements a User-Address relationship where one user can have multiple addresses, and ensures that all operations are atomic (all-or-nothing).
 
 ## Features
 
@@ -15,10 +15,11 @@ This project demonstrates database atomicity concepts using PostgreSQL transacti
 Atomicity/
 ├── src/
 │   ├── config/
-│   │   └── database.ts          # Database configuration
-│   ├── entities/
-│   │   ├── User.ts              # User entity
-│   │   └── Address.ts           # Address entity
+│   │   └── database.ts          # Sequelize database configuration
+│   ├── models/
+│   │   ├── User.ts              # User model
+│   │   ├── Address.ts           # Address model
+│   │   └── index.ts             # Model associations
 │   ├── services/
 │   │   └── transactionService.ts # Transaction service with commit/rollback
 │   ├── routes/
@@ -27,6 +28,8 @@ Atomicity/
 │   │   ├── setup.ts             # Test setup
 │   │   ├── transactionService.test.ts  # Unit tests
 │   │   └── integration.test.ts  # Integration tests
+│   ├── scripts/
+│   │   └── manualTest.ts        # Manual test script
 │   └── index.ts                 # Main application entry
 ├── docker-compose.yml           # PostgreSQL database setup
 ├── package.json
@@ -38,7 +41,7 @@ Atomicity/
 
 - Node.js (v18 or higher)
 - Docker and Docker Compose
-- npm or yarn
+- npm, pnpm, or yarn
 
 ## Setup Instructions
 
@@ -57,6 +60,8 @@ This will start a PostgreSQL container on port 5432 with:
 
 ```bash
 npm install
+# or
+pnpm install
 ```
 
 ### 3. Environment Configuration
@@ -144,12 +149,7 @@ Content-Type: application/json
   ]
 }
 ```
-This endpoint intentionally fails to demonstrate rollback behavior. **Note:** The request will take approximately 10 seconds to respond because:
-1. User is created in the transaction
-2. Address is saved in the transaction
-3. System waits 10 seconds (simulating a long-running operation)
-4. Error is thrown
-5. **Everything is rolled back** - proving atomicity works even during long transactions!
+This endpoint intentionally fails to demonstrate rollback behavior. When an error occurs, the entire transaction is rolled back and no data is saved.
 
 ### Get All Users with Addresses
 ```bash
@@ -319,16 +319,11 @@ You should see the user and addresses you just created, confirming the transacti
 
 6. Click **Send**
 
-**⚠️ Important:** The request will take approximately **10 seconds** to respond. This is intentional to demonstrate that:
-- The transaction is in progress (user and address are being saved)
-- Even after 10 seconds of processing, when an error occurs, **everything is rolled back**
-- Check the server console logs to see the progress messages
-
-**Expected Response (500 Internal Server Error - after ~10 seconds):**
+**Expected Response (500 Internal Server Error):**
 ```json
 {
   "error": "Transaction rolled back as expected",
-  "message": "Simulated transaction failure after 10 seconds - demonstrating rollback"
+  "message": "Simulated transaction failure for testing rollback"
 }
 ```
 
@@ -383,71 +378,80 @@ If you prefer to set up requests manually:
 - URL: `http://localhost:3000/api/users`
 - Use this to verify which data was persisted
 
-### Test Scenarios
-
-The project includes comprehensive tests covering:
-
-1. **Success Scenario** (`transactionService.test.ts`):
-   - Creates user with multiple addresses
-   - Verifies all data is persisted
-   - Confirms referential integrity
-
-2. **Rollback Scenario** (`transactionService.test.ts`):
-   - Simulates transaction failure
-   - Verifies no data is persisted (rollback works)
-   - Confirms atomicity (all-or-nothing)
-
-3. **Integration Tests** (`integration.test.ts`):
-   - Tests API endpoints
-   - Verifies HTTP responses
-   - Tests end-to-end flow
-
 ## How Atomicity Works
 
 ### Transaction Flow
 
-1. **Start Transaction**: `queryRunner.startTransaction()`
+1. **Start Transaction**: `sequelize.transaction()`
 2. **Execute Operations**:
-   - Create user
-   - Create addresses
+   - Create user within transaction
+   - Create addresses within transaction
    - If any error occurs → go to step 3
 3. **Commit or Rollback**:
-   - **Success**: `queryRunner.commitTransaction()` - All changes are saved
-   - **Failure**: `queryRunner.rollbackTransaction()` - All changes are discarded
-4. **Release Resources**: `queryRunner.release()`
+   - **Success**: `transaction.commit()` - All changes are saved
+   - **Failure**: `transaction.rollback()` - All changes are discarded
 
 ### Example: Success Scenario
 
 ```typescript
-// Transaction starts
-await queryRunner.startTransaction();
+// Start transaction
+const transaction = await sequelize.transaction();
 
-// Create user
-const user = await queryRunner.manager.save(User, userData);
+try {
+  // Create user within transaction
+  const user = await User.create(
+    { name: 'John', email: 'john@example.com' },
+    { transaction }
+  );
 
-// Create addresses
-const address1 = await queryRunner.manager.save(Address, address1Data);
-const address2 = await queryRunner.manager.save(Address, address2Data);
+  // Create addresses within transaction
+  const address1 = await Address.create(
+    { street: '123 Main St', userId: user.id },
+    { transaction }
+  );
+  const address2 = await Address.create(
+    { street: '456 Oak Ave', userId: user.id },
+    { transaction }
+  );
 
-// Commit - all changes are saved
-await queryRunner.commitTransaction();
+  // Commit - all changes are saved
+  await transaction.commit();
+} catch (error) {
+  // Rollback on error
+  await transaction.rollback();
+  throw error;
+}
 ```
 
 ### Example: Rollback Scenario
 
 ```typescript
-// Transaction starts
-await queryRunner.startTransaction();
+// Start transaction
+const transaction = await sequelize.transaction();
 
-// Create user
-const user = await queryRunner.manager.save(User, userData);
+try {
+  // Create user within transaction
+  const user = await User.create(
+    { name: 'John', email: 'john@example.com' },
+    { transaction }
+  );
 
-// Error occurs!
-throw new Error('Something went wrong');
+  // Create address within transaction
+  const address = await Address.create(
+    { street: '123 Main St', userId: user.id },
+    { transaction }
+  );
 
-// Rollback - all changes are discarded
-await queryRunner.rollbackTransaction();
-// User and addresses are NOT saved to database
+  // Error occurs!
+  throw new Error('Something went wrong');
+
+  // Rollback - all changes are discarded
+  await transaction.rollback();
+  // User and addresses are NOT saved to database
+} catch (error) {
+  await transaction.rollback();
+  throw error;
+}
 ```
 
 ## Database Schema
@@ -466,17 +470,25 @@ await queryRunner.rollbackTransaction();
 - `state` (VARCHAR)
 - `zipCode` (VARCHAR)
 - `country` (VARCHAR)
-- `user_id` (Foreign Key → users.id)
+- `user_id` (Foreign Key → users.id, CASCADE DELETE)
 - `createdAt` (Timestamp)
 - `updatedAt` (Timestamp)
 
 ## Key Concepts Demonstrated
 
 1. **ACID Properties**: Specifically Atomicity
-2. **Transaction Management**: Using TypeORM QueryRunner
+2. **Transaction Management**: Using Sequelize transactions
 3. **Error Handling**: Proper rollback on failures
 4. **Data Integrity**: Maintaining referential integrity
 5. **One-to-Many Relationships**: User → Addresses
+
+## Technology Stack
+
+- **Runtime**: Node.js with TypeScript
+- **Framework**: Express.js
+- **ORM**: Sequelize
+- **Database**: PostgreSQL
+- **Testing**: Jest with Supertest
 
 ## Troubleshooting
 
@@ -486,7 +498,7 @@ await queryRunner.rollbackTransaction();
 - Verify PostgreSQL is accessible on port 5432
 
 ### TypeScript Compilation Errors
-- Run `npm install` to ensure all dependencies are installed
+- Run `npm install` or `pnpm install` to ensure all dependencies are installed
 - Check `tsconfig.json` configuration
 - Ensure Node.js version is compatible
 
@@ -498,4 +510,3 @@ await queryRunner.rollbackTransaction();
 ## License
 
 ISC
-

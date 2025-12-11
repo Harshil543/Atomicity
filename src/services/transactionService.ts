@@ -55,22 +55,11 @@ export class TransactionService {
         );
         addresses.push(savedAddress);
         console.log(`Address ${i + 1} saved (transaction in progress...)`);
-
-        // If this is the last address and shouldFail is true, wait 10s then throw error
-        // if (shouldFail && i === data.addresses.length - 1) {
-        //   console.log('Waiting 10 seconds before throwing error (demonstrating rollback during long transaction)...');
-        //   await new Promise(resolve => setTimeout(resolve, 10000));
-        //   console.log('10 seconds elapsed. Now throwing error to trigger rollback...');
-        //   throw new Error('Simulated transaction failure after 10 seconds - demonstrating rollback');
-        // }
       }
 
-      // Simulate failure if requested (for testing rollback) - if no addresses were created
-      if (shouldFail && addresses.length === 0) {
-        console.log('Waiting 10 seconds before throwing error (demonstrating rollback during long transaction)...');
-        await new Promise(resolve => setTimeout(resolve, 10000));
-        console.log('10 seconds elapsed. Now throwing error to trigger rollback...');
-        throw new Error('Simulated transaction failure after 10 seconds - demonstrating rollback');
+      // Simulate failure if requested (for testing rollback)
+      if (shouldFail) {
+        throw new Error('Simulated transaction failure for testing rollback');
       }
 
       // Commit transaction

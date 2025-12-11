@@ -111,13 +111,6 @@
 							"pm.test(\"Error message is present\", function () {",
 							"    var jsonData = pm.response.json();",
 							"    pm.expect(jsonData.message).to.exist;",
-							"});",
-							"",
-							"pm.test(\"Response took approximately 10 seconds (demonstrating long transaction)\", function () {",
-							"    var responseTime = pm.response.responseTime;",
-							"    // Should be around 10 seconds (10000ms), allow 1 second tolerance",
-							"    pm.expect(responseTime).to.be.at.least(9000);",
-							"    pm.expect(responseTime).to.be.at.most(12000);",
 							"});"
 						],
 						"type": "text/javascript"
@@ -154,7 +147,7 @@
 						"rollback-test"
 					]
 				},
-				"description": "This endpoint intentionally fails to demonstrate rollback behavior. The request will take approximately 10 seconds to respond because: 1) User is created, 2) Address is saved, 3) System waits 10 seconds (simulating long-running operation), 4) Error is thrown, 5) Everything is rolled back - NO data will be saved to the database. This proves atomicity works even during long transactions!"
+				"description": "This endpoint intentionally fails to demonstrate rollback behavior. When an error occurs, the entire transaction is rolled back and NO data will be saved to the database. This proves atomicity works correctly!"
 			},
 			"response": []
 		},

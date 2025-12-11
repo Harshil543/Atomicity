@@ -83,14 +83,9 @@ After sending, use `GET http://localhost:3000/api/users` to verify the user exis
 ```
 
 ### Expected Response
-- **Status:** `500 Internal Server Error` (after ~10 seconds)
+- **Status:** `500 Internal Server Error`
 - **Error Message:** "Transaction rolled back as expected"
-- **Note:** The request will take approximately **10 seconds** to respond because:
-  1. User is created
-  2. Address is saved
-  3. System waits 10 seconds (demonstrating long-running transaction)
-  4. Error is thrown
-  5. **Everything is rolled back** - no data is saved!
+- **Note:** When an error occurs, the entire transaction is rolled back and no data is saved!
 
 ### Verification
 After sending, use `GET http://localhost:3000/api/users` to verify:
@@ -140,8 +135,7 @@ After sending, use `GET http://localhost:3000/api/users` to verify:
 - ✅ Can retrieve user with addresses
 
 ### Rollback Scenario Should Show:
-- ⏱️ Request takes ~10 seconds (demonstrating long transaction)
-- ✅ Error response (500) after the delay
+- ✅ Error response (500)
 - ✅ Error message mentions "rolled back"
 - ✅ User NOT in database (even though it was created during transaction)
 - ✅ Addresses NOT in database (even though they were saved during transaction)
