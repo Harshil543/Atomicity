@@ -1,0 +1,234 @@
+{
+	"info": {
+		"_postman_id": "atomicity-demo-collection",
+		"name": "Atomicity Demo - User & Address Transactions",
+		"description": "Collection to test database atomicity with success and rollback scenarios",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Health Check",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:3000/health",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"health"
+					]
+				},
+				"description": "Check if the server is running"
+			},
+			"response": []
+		},
+		{
+			"name": "Success Scenario - Create User with Addresses",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 201\", function () {",
+							"    pm.response.to.have.status(201);",
+							"});",
+							"",
+							"pm.test(\"Response has user data\", function () {",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(jsonData.data.user).to.exist;",
+							"    pm.expect(jsonData.data.user.id).to.exist;",
+							"});",
+							"",
+							"pm.test(\"Response has addresses\", function () {",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(jsonData.data.addresses).to.be.an('array');",
+							"    pm.expect(jsonData.data.addresses.length).to.be.greaterThan(0);",
+							"});",
+							"",
+							"// Save user ID for later use",
+							"if (pm.response.code === 201) {",
+							"    var jsonData = pm.response.json();",
+							"    pm.environment.set(\"userId\", jsonData.data.user.id);",
+							"}"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"user\": {\n    \"name\": \"John Doe\",\n    \"email\": \"john.doe@example.com\"\n  },\n  \"addresses\": [\n    {\n      \"street\": \"123 Main Street\",\n      \"city\": \"New York\",\n      \"state\": \"NY\",\n      \"zipCode\": \"10001\",\n      \"country\": \"USA\"\n    },\n    {\n      \"street\": \"456 Oak Avenue\",\n      \"city\": \"Los Angeles\",\n      \"state\": \"CA\",\n      \"zipCode\": \"90001\",\n      \"country\": \"USA\"\n    }\n  ]\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:3000/api/users",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"api",
+						"users"
+					]
+				},
+				"description": "This endpoint creates a user with multiple addresses in a transaction. If successful, all data is committed to the database."
+			},
+			"response": []
+		},
+		{
+			"name": "Rollback Scenario - Transaction Failure",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 500 (expected failure)\", function () {",
+							"    pm.response.to.have.status(500);",
+							"});",
+							"",
+							"pm.test(\"Response indicates rollback\", function () {",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(jsonData.error).to.include(\"rolled back\");",
+							"});",
+							"",
+							"pm.test(\"Error message is present\", function () {",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(jsonData.message).to.exist;",
+							"});",
+							"",
+							"pm.test(\"Response took approximately 10 seconds (demonstrating long transaction)\", function () {",
+							"    var responseTime = pm.response.responseTime;",
+							"    // Should be around 10 seconds (10000ms), allow 1 second tolerance",
+							"    pm.expect(responseTime).to.be.at.least(9000);",
+							"    pm.expect(responseTime).to.be.at.most(12000);",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"user\": {\n    \"name\": \"Bob Smith\",\n    \"email\": \"bob.smith@example.com\"\n  },\n  \"addresses\": [\n    {\n      \"street\": \"789 Failure Lane\",\n      \"city\": \"Failure City\",\n      \"state\": \"FC\",\n      \"zipCode\": \"99999\",\n      \"country\": \"USA\"\n    }\n  ]\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:3000/api/users/rollback-test",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"api",
+						"users",
+						"rollback-test"
+					]
+				},
+				"description": "This endpoint intentionally fails to demonstrate rollback behavior. The request will take approximately 10 seconds to respond because: 1) User is created, 2) Address is saved, 3) System waits 10 seconds (simulating long-running operation), 4) Error is thrown, 5) Everything is rolled back - NO data will be saved to the database. This proves atomicity works even during long transactions!"
+			},
+			"response": []
+		},
+		{
+			"name": "Get All Users with Addresses",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:3000/api/users",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"api",
+						"users"
+					]
+				},
+				"description": "Retrieve all users with their addresses. Use this to verify that:\n1. Success scenario data is persisted\n2. Rollback scenario data is NOT persisted"
+			},
+			"response": []
+		},
+		{
+			"name": "Get User by ID with Addresses",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:3000/api/users/{{userId}}",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"api",
+						"users",
+						"{{userId}}"
+					]
+				},
+				"description": "Get a specific user by ID with all their addresses. Replace {{userId}} with an actual user ID or use the variable from the success scenario."
+			},
+			"response": []
+		},
+		{
+			"name": "Verify Rollback - Check User Not Created",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:3000/api/users",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"api",
+						"users"
+					]
+				},
+				"description": "After running the rollback scenario, use this to verify that the user (bob.smith@example.com) was NOT created in the database."
+			},
+			"response": []
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:3000",
+			"type": "string"
+		}
+	]
+}
+
