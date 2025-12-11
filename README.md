@@ -210,6 +210,21 @@ This will test:
 - Lost Update
 - Serializable isolation
 
+### Run Consistency Tests
+To test consistency:
+```bash
+npm test -- consistencyService.test.ts
+```
+
+This will test:
+- Unique Constraint
+- Not Null Constraint
+- Foreign Key Constraint
+- Cascade Delete (Referential Integrity)
+- Data Type Consistency
+- Business Rule Consistency
+- Transaction Consistency
+
 ## Testing with Postman
 
 ### Import Postman Collection
@@ -623,16 +638,121 @@ Demonstrates the highest isolation level where transactions are completely isola
 2. Observe that Transaction 2 cannot read uncommitted data
 3. After Transaction 1 commits, Transaction 2 can see the changes
 
+## Consistency (C of ACID) - Implementation
+
+This project demonstrates **Consistency** - ensuring that transactions bring the database from one valid state to another, maintaining all constraints, rules, and integrity.
+
+### Consistency Concepts Demonstrated
+
+1. **Unique Constraints** - Prevents duplicate values 
+2. **Not Null Constraints** - Ensures required fields are present
+3. **Foreign Key Constraints** - Maintains referential integrity
+4. **Cascade Delete** - Automatically maintains relationships
+5. **Data Type Consistency** - Validates data types
+6. **Business Rule Consistency** - Enforces custom business rules
+7. **Transaction Consistency** - Ensures database remains consistent even on failure
+
+### Consistency Endpoints
+
+#### 1. Unique Constraint
+```bash
+POST /api/consistency/unique-constraint
+```
+Demonstrates that duplicate emails are prevented by unique constraint.
+
+#### 2. Not Null Constraint
+```bash
+POST /api/consistency/not-null-constraint
+```
+Demonstrates that required fields cannot be null.
+
+#### 3. Foreign Key Constraint
+```bash
+POST /api/consistency/foreign-key-constraint
+```
+Demonstrates that addresses must reference valid users.
+
+#### 4. Cascade Delete
+```bash
+POST /api/consistency/cascade-delete
+```
+Demonstrates that deleting a user automatically deletes associated addresses.
+
+#### 5. Data Type Consistency
+```bash
+POST /api/consistency/data-type
+```
+Demonstrates that invalid data types are rejected.
+
+#### 6. Business Rule Consistency
+```bash
+POST /api/consistency/business-rules
+Content-Type: application/json
+
+{
+  "user": {
+    "name": "John Doe",
+    "email": "john@example.com"
+  },
+  "addresses": [
+    {
+      "street": "123 Main St",
+      "city": "New York",
+      "state": "NY",
+      "zipCode": "10001",
+      "country": "USA"
+    }
+  ]
+}
+```
+Validates business rules (email format, name length, zip code format, etc.).
+
+#### 7. Transaction Consistency
+```bash
+POST /api/consistency/transaction-consistency
+```
+Demonstrates that database remains consistent even when transaction fails partway.
+
+### Testing Consistency
+
+**Example: Test Unique Constraint**
+```bash
+POST /api/consistency/unique-constraint
+```
+
+**Example: Test Business Rules**
+```bash
+POST /api/consistency/business-rules
+{
+  "user": {
+    "name": "AB",  // Too short - will fail
+    "email": "invalid-email"  // Missing @ - will fail
+  },
+  "addresses": [
+    {
+      "street": "123 Test St",
+      "city": "Test City",
+      "state": "TS",
+      "zipCode": "123",  // Invalid format - will fail
+      "country": "USA"
+    }
+  ]
+}
+```
+
 ## Key Concepts Demonstrated
 
 1. **ACID Properties**: 
    - **Atomicity (A)**: All-or-nothing transactions
+   - **Consistency (C)**: Database remains in valid state
    - **Isolation (I)**: Concurrent transactions don't interfere
 2. **Transaction Management**: Using Sequelize transactions with isolation levels
 3. **Error Handling**: Proper rollback on failures
-4. **Data Integrity**: Maintaining referential integrity
+4. **Data Integrity**: Maintaining referential integrity through constraints
 5. **One-to-Many Relationships**: User → Addresses
 6. **Isolation Levels**: Read Uncommitted, Read Committed, Repeatable Read, Serializable
+7. **Database Constraints**: Unique, Not Null, Foreign Key, Cascade Delete
+8. **Business Rules**: Custom validation rules enforced within transactions
 
 ## Technology Stack
 
