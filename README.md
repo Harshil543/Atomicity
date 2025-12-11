@@ -195,6 +195,21 @@ This script will:
 - Verify that rollback worked correctly
 - Display a summary of all data in the database
 
+### Run Isolation Tests
+To test isolation levels:
+```bash
+npm test -- isolationService.test.ts
+```
+
+This will test:
+- Dirty Read (Read Uncommitted)
+- Read Committed (No Dirty Read)
+- Repeatable Read
+- Non-Repeatable Read
+- Phantom Read
+- Lost Update
+- Serializable isolation
+
 ## Testing with Postman
 
 ### Import Postman Collection
@@ -391,6 +406,72 @@ If you prefer to set up requests manually:
    - **Success**: `transaction.commit()` - All changes are saved
    - **Failure**: `transaction.rollback()` - All changes are discarded
 
+## How Isolation Works
+
+### What is Isolation?
+
+Isolation ensures that concurrent transactions do not interfere with each other. Each transaction should appear to be the only one operating on the database at that time.
+
+### Isolation Levels
+
+#### 1. Read Uncommitted (Lowest)
+- **Allows**: Dirty reads, non-repeatable reads, phantom reads
+- **Use Case**: Rarely used, lowest performance overhead
+- **Example**: Transaction 2 can read uncommitted data from Transaction 1
+
+#### 2. Read Committed (Default in PostgreSQL)
+- **Prevents**: Dirty reads
+- **Allows**: Non-repeatable reads, phantom reads
+- **Use Case**: Most common default, good balance
+- **Example**: Transaction 2 cannot read uncommitted data, but may see different values in subsequent reads
+
+#### 3. Repeatable Read
+- **Prevents**: Dirty reads, non-repeatable reads
+- **Allows**: Phantom reads
+- **Use Case**: When you need consistent reads within a transaction
+- **Example**: Transaction 1 sees the same value in all reads, even if Transaction 2 updates the data
+
+#### 4. Serializable (Highest)
+- **Prevents**: Dirty reads, non-repeatable reads, phantom reads
+- **Use Case**: Highest data integrity, but may cause deadlocks
+- **Example**: Transactions are completely isolated, executed sequentially
+
+### Isolation Phenomena
+
+1. **Dirty Read**: Reading uncommitted data from another transaction
+2. **Non-Repeatable Read**: Same query returns different results within a transaction
+3. **Phantom Read**: New rows appear in subsequent reads within a transaction
+4. **Lost Update**: Two transactions update the same record, one overwrites the other
+
+### Example: Isolation in Action
+
+```typescript
+// Transaction 1 with Read Committed
+const transaction1 = await sequelize.transaction({
+  isolationLevel: Transaction.ISOLATION_LEVELS.READ_COMMITTED,
+});
+
+// Transaction 2 with Read Committed
+const transaction2 = await sequelize.transaction({
+  isolationLevel: Transaction.ISOLATION_LEVELS.READ_COMMITTED,
+});
+
+// Transaction 1: Update user
+await User.update(
+  { name: 'Updated Name' },
+  { where: { id: 1 }, transaction: transaction1 }
+);
+
+// Transaction 2: Read user (sees old value - no dirty read)
+const user = await User.findByPk(1, { transaction: transaction2 });
+
+// Transaction 1: Commit
+await transaction1.commit();
+
+// Transaction 2: Read again (now sees new value)
+const user2 = await User.findByPk(1, { transaction: transaction2 });
+```
+
 ### Example: Success Scenario
 
 ```typescript
@@ -474,13 +555,84 @@ try {
 - `createdAt` (Timestamp)
 - `updatedAt` (Timestamp)
 
+## Isolation (I of ACID) - Implementation
+
+This project demonstrates **Isolation** - ensuring concurrent transactions do not interfere with each other.
+
+### Isolation Levels Demonstrated
+
+1. **Read Uncommitted** - Lowest isolation, allows dirty reads
+2. **Read Committed** - Prevents dirty reads, allows non-repeatable reads
+3. **Repeatable Read** - Same query returns same results within a transaction
+4. **Serializable** - Highest isolation, transactions are completely isolated
+
+### Isolation Endpoints
+
+#### 1. Dirty Read (Read Uncommitted)
+```bash
+POST /api/isolation/dirty-read/:userId
+```
+Demonstrates that Transaction 2 can read uncommitted data from Transaction 1.
+
+#### 2. Read Committed (No Dirty Read)
+```bash
+POST /api/isolation/read-committed/:userId
+```
+Demonstrates that Transaction 2 cannot read uncommitted data. It only sees changes after Transaction 1 commits.
+
+#### 3. Repeatable Read
+```bash
+POST /api/isolation/repeatable-read/:userId
+```
+Demonstrates that Transaction 1 sees the same value in all reads, even if Transaction 2 updates the data.
+
+#### 4. Non-Repeatable Read
+```bash
+POST /api/isolation/non-repeatable-read/:userId
+```
+Demonstrates that in Read Committed level, subsequent reads may return different values.
+
+#### 5. Phantom Read
+```bash
+POST /api/isolation/phantom-read
+```
+Demonstrates that new rows can appear in subsequent reads within the same transaction.
+
+#### 6. Lost Update
+```bash
+POST /api/isolation/lost-update/:userId
+```
+Demonstrates the lost update problem where two transactions update the same record and one update is lost.
+
+#### 7. Serializable
+```bash
+POST /api/isolation/serializable/:userId
+```
+Demonstrates the highest isolation level where transactions are completely isolated.
+
+### Testing Isolation
+
+**Example: Test Dirty Read**
+1. Create a user first: `POST /api/users`
+2. Note the user ID from the response
+3. Test dirty read: `POST /api/isolation/dirty-read/{userId}`
+4. Observe that Transaction 2 can read uncommitted data
+
+**Example: Test Read Committed**
+1. Test read committed: `POST /api/isolation/read-committed/{userId}`
+2. Observe that Transaction 2 cannot read uncommitted data
+3. After Transaction 1 commits, Transaction 2 can see the changes
+
 ## Key Concepts Demonstrated
 
-1. **ACID Properties**: Specifically Atomicity
-2. **Transaction Management**: Using Sequelize transactions
+1. **ACID Properties**: 
+   - **Atomicity (A)**: All-or-nothing transactions
+   - **Isolation (I)**: Concurrent transactions don't interfere
+2. **Transaction Management**: Using Sequelize transactions with isolation levels
 3. **Error Handling**: Proper rollback on failures
 4. **Data Integrity**: Maintaining referential integrity
 5. **One-to-Many Relationships**: User → Addresses
+6. **Isolation Levels**: Read Uncommitted, Read Committed, Repeatable Read, Serializable
 
 ## Technology Stack
 

@@ -1,6 +1,7 @@
 import express from 'express';
 import { initializeDatabase } from './config/database';
 import userRoutes from './routes/userRoutes';
+import isolationRoutes from './routes/isolationRoutes';
 // Import models to initialize associations
 import './models';
 
@@ -13,6 +14,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // Routes
 app.use('/api', userRoutes);
+app.use('/api', isolationRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
